@@ -18,6 +18,9 @@ save_steps: 400
 logging_steps: 50
 threshold: 0.5
 auxiliary_filler_loss: false
-output_dir: artifacts/partial_unfreeze
+upsample_indic: true
+output_dir: /content/drive/MyDrive/smart_turn_runs/partial_unfreeze
 resume_from: null
-max_train_samples: null
+max_train_samples: 100000
+write_batch_size: 128
+subset_cache: /content/drive/MyDrive/smart_turn_en_hi_100k
