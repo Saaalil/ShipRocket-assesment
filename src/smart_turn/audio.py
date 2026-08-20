@@ -1,8 +1,31 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from smart_turn.constants import MAX_AUDIO_SAMPLES, SAMPLE_RATE
+
+
+def decode_hf_audio(audio: Any) -> tuple[np.ndarray, int]:
+    """Decode Hugging Face audio whether it is a dict or an AudioDecoder."""
+    if isinstance(audio, dict):
+        return to_mono(np.asarray(audio["array"], dtype=np.float32)), int(
+            audio.get("sampling_rate", SAMPLE_RATE)
+        )
+    if hasattr(audio, "get_all_samples"):
+        samples = audio.get_all_samples()
+        data = samples.data
+        if hasattr(data, "detach"):
+            data = data.detach().cpu().numpy()
+        rate = int(getattr(samples, "sample_rate", SAMPLE_RATE))
+        return to_mono(np.asarray(data, dtype=np.float32)), rate
+    try:
+        array = np.asarray(audio["array"], dtype=np.float32)
+        rate = int(audio["sampling_rate"])
+        return to_mono(array), rate
+    except Exception as exc:
+        raise TypeError(f"Unsupported audio type: {type(audio)}") from exc
 
 
 def to_mono(audio: np.ndarray) -> np.ndarray:

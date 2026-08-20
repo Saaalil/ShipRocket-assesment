@@ -7,14 +7,14 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from smart_turn.audio import decode_hf_audio
 from smart_turn.augment import maybe_augment
 from smart_turn.features import extract_log_mel
 from smart_turn.splits import is_indic_language
 
 
 def _audio_array(sample: dict[str, Any]) -> tuple[np.ndarray, int]:
-    audio = sample["audio"]
-    return np.asarray(audio["array"], dtype=np.float32), int(audio.get("sampling_rate", 16_000))
+    return decode_hf_audio(sample["audio"])
 
 
 class TurnDataset(Dataset):

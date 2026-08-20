@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import Trainer, TrainingArguments, WhisperFeatureExtractor
 
+from smart_turn.audio import decode_hf_audio
 from smart_turn.config import load_experiment_config
 from smart_turn.constants import MAX_AUDIO_SECONDS
 from smart_turn.data import TurnCollator, TurnDataset
@@ -18,12 +19,11 @@ from smart_turn.splits import grouped_indices, keep_language, language_allowlist
 
 
 def _compact_row(row: dict[str, Any]) -> dict[str, Any]:
-    audio = row["audio"]
-    array = np.asarray(audio["array"], dtype=np.float32)
+    array, sample_rate = decode_hf_audio(row["audio"])
     return {
         "audio": {
             "array": array,
-            "sampling_rate": int(audio.get("sampling_rate", 16_000)),
+            "sampling_rate": sample_rate,
         },
         "id": str(row.get("id", "")),
         "language": str(row.get("language", "")),
