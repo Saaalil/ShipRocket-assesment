@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -13,54 +14,86 @@ from smart_turn.constants import MAX_AUDIO_SECONDS
 from smart_turn.data import TurnCollator, TurnDataset
 from smart_turn.evaluate import compute_metrics
 from smart_turn.model import SmartTurnModel
-from smart_turn.splits import grouped_indices, is_indic_language, keep_language, language_allowlist
+from smart_turn.splits import grouped_indices, keep_language, language_allowlist
+
+
+def _compact_row(row: dict[str, Any]) -> dict[str, Any]:
+    audio = row["audio"]
+    array = np.asarray(audio["array"], dtype=np.float32)
+    return {
+        "audio": {
+            "array": array,
+            "sampling_rate": int(audio.get("sampling_rate", 16_000)),
+        },
+        "id": str(row.get("id", "")),
+        "language": str(row.get("language", "")),
+        "endpoint_bool": bool(row.get("endpoint_bool")),
+        "dataset": str(row.get("dataset", "unknown")),
+        "midfiller": bool(row.get("midfiller", False)),
+        "endfiller": bool(row.get("endfiller", False)),
+    }
 
 
 def _load_hf_dataset(
     name: str,
     max_samples: int | None = None,
     keep_languages: list[str] | None = None,
-    indic_languages: list[str] | None = None,
-    min_indic_fraction: float = 0.2,
+    subset_cache: str | None = None,
+    write_batch_size: int = 128,
 ):
-    """Stream rows so Colab never materializes the full 41 GB Arrow cache.
+    """Stream filtered clips to disk in small batches. Peak RAM is one batch, not 100k rows."""
+    from datasets import Dataset, concatenate_datasets, load_dataset, load_from_disk
 
-    Language is a column inside mixed parquet shards. There are no separate
-    Hindi/English/Hinglish files, and Hinglish is not labeled.
-    """
-    from datasets import Dataset, load_dataset
+    cache = Path(subset_cache or "artifacts/subset_en_hi")
+    if (cache / "dataset_info.json").exists():
+        print(f"reusing on-disk subset at {cache}")
+        return load_from_disk(str(cache))
 
     stream = load_dataset(name, split="train", streaming=True)
     allowed = language_allowlist(keep_languages or [])
-    indic = {item.lower() for item in (indic_languages or [])}
     limit = int(max_samples) if max_samples else None
-    min_indic = int((limit or 0) * min_indic_fraction) if indic and limit else 0
-    rows: list[dict[str, Any]] = []
-    indic_count = 0
-    non_indic_budget = None if limit is None else max(0, limit - min_indic)
+    parts_dir = cache.parent / f"{cache.name}_parts"
+    parts_dir.mkdir(parents=True, exist_ok=True)
+
+    batch: list[dict[str, Any]] = []
+    part_paths: list[Path] = []
+    kept = 0
+    seen = 0
+
+    def flush() -> None:
+        nonlocal batch
+        if not batch:
+            return
+        part = parts_dir / f"part_{len(part_paths):05d}"
+        Dataset.from_list(batch).save_to_disk(str(part))
+        part_paths.append(part)
+        batch = []
 
     for row in stream:
+        seen += 1
         language = str(row.get("language", ""))
         if allowed and not keep_language(language, allowed):
             continue
-        is_indic = bool(indic) and is_indic_language(language, list(indic))
-        if limit is not None and len(rows) >= limit:
+        batch.append(_compact_row(row))
+        kept += 1
+        if len(batch) >= write_batch_size:
+            flush()
+            print(f"wrote {kept} kept / {seen} scanned to disk", flush=True)
+        if limit is not None and kept >= limit:
             break
-        if (
-            limit is not None
-            and not is_indic
-            and non_indic_budget is not None
-            and (len(rows) - indic_count) >= non_indic_budget
-            and indic_count < min_indic
-        ):
-            continue
-        rows.append(row)
-        indic_count += int(is_indic)
-        if limit is not None and len(rows) >= limit and indic_count >= min_indic:
-            break
-    if not rows:
+    flush()
+    if not part_paths:
         raise RuntimeError(f"No rows loaded from {name} with filters {sorted(allowed)}")
-    return Dataset.from_list(rows)
+
+    merged = concatenate_datasets([load_from_disk(str(path)) for path in part_paths])
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    merged.save_to_disk(str(cache))
+    del merged
+    for path in part_paths:
+        shutil.rmtree(path, ignore_errors=True)
+    shutil.rmtree(parts_dir, ignore_errors=True)
+    print(f"saved {kept} clips to {cache}")
+    return load_from_disk(str(cache))
 
 
 def build_model(config: dict[str, Any]) -> SmartTurnModel:
@@ -76,13 +109,15 @@ def build_model(config: dict[str, Any]) -> SmartTurnModel:
 
 def prepare_splits(config: dict[str, Any]) -> tuple[TurnDataset, TurnDataset]:
     max_samples = config.get("max_train_samples")
-    keep_languages = list(config.get("english_codes", [])) + list(config.get("indic_languages", []))
+    keep_languages = list(config.get("english_codes", [])) + list(
+        config.get("indic_languages", [])
+    )
     raw = _load_hf_dataset(
         config["train_dataset"],
         max_samples=max_samples,
         keep_languages=keep_languages or None,
-        indic_languages=list(config.get("indic_languages", [])),
-        min_indic_fraction=float(config.get("min_indic_fraction", 0.2)),
+        subset_cache=config.get("subset_cache"),
+        write_batch_size=int(config.get("write_batch_size", 128)),
     )
     ids = [str(value) for value in raw["id"]]
     sources = [str(value) for value in raw["dataset"]]
@@ -115,7 +150,7 @@ def train_from_config(config_path: str) -> Path:
     args = TrainingArguments(
         output_dir=str(output_dir),
         per_device_train_batch_size=int(config.get("train_batch_size", 8)),
-        per_device_eval_batch_size=int(config.get("eval_batch_size", 16)),
+        per_device_eval_batch_size=int(config.get("eval_batch_size", 8)),
         gradient_accumulation_steps=int(config.get("gradient_accumulation_steps", 16)),
         num_train_epochs=float(config.get("num_epochs", 1)),
         learning_rate=float(config.get("learning_rate", 5e-5)),
@@ -124,9 +159,9 @@ def train_from_config(config_path: str) -> Path:
         max_grad_norm=float(config.get("max_grad_norm", 1.0)),
         fp16=bool(config.get("fp16", True)),
         eval_strategy="steps",
-        eval_steps=int(config.get("eval_steps", 400)),
-        save_steps=int(config.get("save_steps", 400)),
-        logging_steps=int(config.get("logging_steps", 50)),
+        eval_steps=int(config.get("eval_steps", 200)),
+        save_steps=int(config.get("save_steps", 200)),
+        logging_steps=int(config.get("logging_steps", 20)),
         load_best_model_at_end=True,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
