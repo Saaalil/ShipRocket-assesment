@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import shutil
 from pathlib import Path
 from typing import Any
@@ -141,13 +142,30 @@ def prepare_splits(config: dict[str, Any]) -> tuple[TurnDataset, TurnDataset]:
     return train_ds, val_ds
 
 
+def _training_arguments(**kwargs: Any) -> TrainingArguments:
+    """Build TrainingArguments for both transformers v4 (`warmup_ratio`) and v5+ (`warmup_steps`)."""
+    params = inspect.signature(TrainingArguments.__init__).parameters
+    warmup = float(kwargs.pop("warmup_ratio", 0.08))
+    if "warmup_ratio" in params:
+        kwargs["warmup_ratio"] = warmup
+    else:
+        # v5+: warmup_steps accepts a float in [0, 1) as a ratio of total steps.
+        kwargs["warmup_steps"] = warmup
+    if "eval_strategy" not in params and "evaluation_strategy" in params:
+        kwargs["evaluation_strategy"] = kwargs.pop("eval_strategy", "no")
+    elif "evaluation_strategy" not in params:
+        kwargs.pop("evaluation_strategy", None)
+    filtered = {key: value for key, value in kwargs.items() if key in params}
+    return TrainingArguments(**filtered)
+
+
 def train_from_config(config_path: str) -> Path:
     config = load_experiment_config(config_path)
     output_dir = Path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     model = build_model(config)
     train_ds, val_ds = prepare_splits(config)
-    args = TrainingArguments(
+    args = _training_arguments(
         output_dir=str(output_dir),
         per_device_train_batch_size=int(config.get("train_batch_size", 8)),
         per_device_eval_batch_size=int(config.get("eval_batch_size", 8)),
