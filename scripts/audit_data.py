@@ -33,7 +33,9 @@ def main() -> None:
         "sources": dict(Counter(sources).most_common(20)),
         "synthetic_true": sum(synthetic),
         "indic_proxy_count": sum(
-            1 for lang in languages if lang.lower() in {item.lower() for item in config["indic_languages"]}
+            1
+            for lang in languages
+            if lang.lower() in {item.lower() for item in config["indic_languages"]}
         ),
     }
     out = Path("reports/metrics/data_audit.json")

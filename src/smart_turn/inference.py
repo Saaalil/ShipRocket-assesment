@@ -26,7 +26,11 @@ def _load_onnx_session(model_path: str):
 
     options = ort.SessionOptions()
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-    return ort.InferenceSession(model_path, sess_options=options, providers=["CPUExecutionProvider"])
+    return ort.InferenceSession(
+        model_path,
+        sess_options=options,
+        providers=["CPUExecutionProvider"],
+    )
 
 
 def resolve_model_path(explicit: str | None = None, allow_official_fallback: bool = True) -> str:
@@ -77,7 +81,11 @@ def predict_turn(
     }
 
 
-def predict_file(path: str, threshold: float | None = None, model_path: str | None = None) -> TurnPrediction:
+def predict_file(
+    path: str,
+    threshold: float | None = None,
+    model_path: str | None = None,
+) -> TurnPrediction:
     import soundfile as sf
 
     audio, sample_rate = sf.read(path, always_2d=False)

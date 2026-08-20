@@ -30,7 +30,8 @@ def main() -> None:
             "class_mapping": {"0": "incomplete", "1": "complete"},
         },
     )
-    calib = np.zeros((int(config.get("calibration_samples", 32)), N_MELS, N_FRAMES), dtype=np.float32)
+    n_calib = int(config.get("calibration_samples", 32))
+    calib = np.zeros((n_calib, N_MELS, N_FRAMES), dtype=np.float32)
     quantize_onnx(fp32, int8, calib)
     print(f"exported {fp32} and {int8}")
 

@@ -52,7 +52,11 @@ def export_onnx(
     return output
 
 
-def quantize_onnx(fp32_path: str | Path, int8_path: str | Path, calibration_features: np.ndarray) -> Path:
+def quantize_onnx(
+    fp32_path: str | Path,
+    int8_path: str | Path,
+    calibration_features: np.ndarray,
+) -> Path:
     from onnxruntime.quantization import CalibrationDataReader, QuantType, quantize_static
 
     class Reader(CalibrationDataReader):
