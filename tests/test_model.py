@@ -4,7 +4,7 @@ import torch
 from transformers import WhisperConfig
 
 from smart_turn.model import SmartTurnModel
-from smart_turn.splits import grouped_indices
+from smart_turn.splits import grouped_indices, keep_language, language_allowlist
 
 
 def test_tiny_forward_and_freeze() -> None:
@@ -40,3 +40,10 @@ def test_grouped_split_is_disjoint() -> None:
     train, valid = grouped_indices(ids, sources, labels, val_fraction=0.2, seed=0)
     assert set(train).isdisjoint(set(valid))
     assert len(train) + len(valid) == len(ids)
+
+
+def test_language_filter_keeps_english_and_hindi() -> None:
+    allowed = language_allowlist(["eng", "en"], ["hin", "hindi"])
+    assert keep_language("eng", allowed)
+    assert keep_language("Hindi", allowed)
+    assert not keep_language("fra", allowed)

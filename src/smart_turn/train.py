@@ -13,13 +13,54 @@ from smart_turn.constants import MAX_AUDIO_SECONDS
 from smart_turn.data import TurnCollator, TurnDataset
 from smart_turn.evaluate import compute_metrics
 from smart_turn.model import SmartTurnModel
-from smart_turn.splits import grouped_indices
+from smart_turn.splits import grouped_indices, is_indic_language, keep_language, language_allowlist
 
 
-def _load_hf_dataset(name: str):
-    from datasets import load_dataset
+def _load_hf_dataset(
+    name: str,
+    max_samples: int | None = None,
+    keep_languages: list[str] | None = None,
+    indic_languages: list[str] | None = None,
+    min_indic_fraction: float = 0.2,
+):
+    """Stream rows so Colab never materializes the full 41 GB Arrow cache.
 
-    return load_dataset(name)["train"]
+    Language is a column inside mixed parquet shards. There are no separate
+    Hindi/English/Hinglish files, and Hinglish is not labeled.
+    """
+    from datasets import Dataset, load_dataset
+
+    stream = load_dataset(name, split="train", streaming=True)
+    allowed = language_allowlist(keep_languages or [])
+    indic = {item.lower() for item in (indic_languages or [])}
+    limit = int(max_samples) if max_samples else None
+    min_indic = int((limit or 0) * min_indic_fraction) if indic and limit else 0
+    rows: list[dict[str, Any]] = []
+    indic_count = 0
+    non_indic_budget = None if limit is None else max(0, limit - min_indic)
+
+    for row in stream:
+        language = str(row.get("language", ""))
+        if allowed and not keep_language(language, allowed):
+            continue
+        is_indic = bool(indic) and is_indic_language(language, list(indic))
+        if limit is not None and len(rows) >= limit:
+            break
+        if (
+            limit is not None
+            and not is_indic
+            and non_indic_budget is not None
+            and (len(rows) - indic_count) >= non_indic_budget
+            and indic_count < min_indic
+        ):
+            continue
+        rows.append(row)
+        indic_count += int(is_indic)
+        if limit is not None and len(rows) >= limit and indic_count >= min_indic:
+            break
+    if not rows:
+        raise RuntimeError(f"No rows loaded from {name} with filters {sorted(allowed)}")
+    return Dataset.from_list(rows)
 
 
 def build_model(config: dict[str, Any]) -> SmartTurnModel:
@@ -34,10 +75,15 @@ def build_model(config: dict[str, Any]) -> SmartTurnModel:
 
 
 def prepare_splits(config: dict[str, Any]) -> tuple[TurnDataset, TurnDataset]:
-    raw = _load_hf_dataset(config["train_dataset"])
     max_samples = config.get("max_train_samples")
-    if max_samples:
-        raw = raw.select(range(min(int(max_samples), len(raw))))
+    keep_languages = list(config.get("english_codes", [])) + list(config.get("indic_languages", []))
+    raw = _load_hf_dataset(
+        config["train_dataset"],
+        max_samples=max_samples,
+        keep_languages=keep_languages or None,
+        indic_languages=list(config.get("indic_languages", [])),
+        min_indic_fraction=float(config.get("min_indic_fraction", 0.2)),
+    )
     ids = [str(value) for value in raw["id"]]
     sources = [str(value) for value in raw["dataset"]]
     labels = [1 if value else 0 for value in raw["endpoint_bool"]]

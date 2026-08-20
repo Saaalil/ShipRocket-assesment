@@ -42,3 +42,14 @@ def grouped_indices(
 def is_indic_language(language: str, indic_languages: Sequence[str]) -> bool:
     code = str(language).strip().lower()
     return code in {item.lower() for item in indic_languages}
+
+
+def language_allowlist(*groups: Sequence[str]) -> set[str]:
+    allowed: set[str] = set()
+    for group in groups:
+        allowed.update(item.strip().lower() for item in group)
+    return allowed
+
+
+def keep_language(language: str, allowed: set[str]) -> bool:
+    return str(language).strip().lower() in allowed
