@@ -1,0 +1,8 @@
+name: baseline
+data: configs/data.yaml
+base_model: openai/whisper-tiny
+official_onnx_repo: pipecat-ai/smart-turn-v3
+official_onnx_file: smart-turn-v3.2-cpu.onnx
+threshold: 0.5
+eval_batch_size: 16
+output_dir: artifacts/baseline

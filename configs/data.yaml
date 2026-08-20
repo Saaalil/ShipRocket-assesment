@@ -1,0 +1,9 @@
+train_dataset: pipecat-ai/smart-turn-data-v3.2-train
+test_dataset: pipecat-ai/smart-turn-data-v3.2-test
+seed: 42
+val_fraction: 0.1
+group_by: [dataset, id]
+indic_languages: [hin, mar, hindi, marathi]
+english_codes: [eng, en, english]
+max_audio_seconds: 8
+sample_rate: 16000

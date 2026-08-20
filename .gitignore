@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.env
+.python-version
+
+# Caches and data
+.cache/
+hf_cache/
+data/raw/
+data/processed/
+*.arrow
+*.parquet
+
+# Models and checkpoints
+artifacts/
+checkpoints/
+outputs/
+wandb/
+runs/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+*.onnx.data
+
+# Notebooks / OS
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Reports generated at runtime
+reports/metrics/*.json
+reports/figures/*.png
+!reports/metrics/.gitkeep
+!reports/figures/.gitkeep

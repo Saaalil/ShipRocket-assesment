@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-turn"
+version = "0.1.0"
+description = "Tiny audio-native turn detection model for the Shiprocket assignment."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Saalil" }]
+dependencies = [
+  "numpy>=1.26",
+  "pyyaml>=6.0",
+  "scikit-learn>=1.4",
+  "soundfile>=0.12",
+  "librosa>=0.10",
+  "huggingface_hub>=0.24",
+]
+
+[project.optional-dependencies]
+train = [
+  "torch>=2.2",
+  "torchaudio>=2.2",
+  "transformers>=4.44",
+  "datasets>=2.20",
+  "accelerate>=0.33",
+  "onnx>=1.16",
+  "onnxruntime>=1.18",
+]
+demo = [
+  "gradio>=4.44",
+  "onnxruntime>=1.18",
+  "transformers>=4.44",
+  "torch>=2.2",
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+smart-turn-predict = "smart_turn.inference:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "scripts", "tests", "demo"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

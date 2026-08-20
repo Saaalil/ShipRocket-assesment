@@ -1,0 +1,45 @@
+:root {
+  color: #111;
+  background: #f6f6f4;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 720px;
+  margin: 48px auto;
+  padding: 0 20px;
+}
+
+h1 {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.lede,
+#status {
+  color: #444;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+
+button,
+input[type="file"] {
+  font: inherit;
+}
+
+pre {
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 16px;
+  min-height: 96px;
+}
