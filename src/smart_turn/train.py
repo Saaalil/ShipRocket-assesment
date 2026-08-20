@@ -142,9 +142,8 @@ def prepare_splits(config: dict[str, Any]) -> tuple[TurnDataset, TurnDataset]:
     return train_ds, val_ds
 
 
-def _training_arguments(**kwargs: Any) -> TrainingArguments:
-    """Build TrainingArguments for both transformers v4 (`warmup_ratio`) and v5+ (`warmup_steps`)."""
-    params = inspect.signature(TrainingArguments.__init__).parameters
+def _compat_training_kwargs(params: Any, **kwargs: Any) -> dict[str, Any]:
+    """Map warmup/eval names for transformers v4 (`warmup_ratio`) and v5+ (`warmup_steps`)."""
     warmup = float(kwargs.pop("warmup_ratio", 0.08))
     if "warmup_ratio" in params:
         kwargs["warmup_ratio"] = warmup
@@ -155,8 +154,12 @@ def _training_arguments(**kwargs: Any) -> TrainingArguments:
         kwargs["evaluation_strategy"] = kwargs.pop("eval_strategy", "no")
     elif "evaluation_strategy" not in params:
         kwargs.pop("evaluation_strategy", None)
-    filtered = {key: value for key, value in kwargs.items() if key in params}
-    return TrainingArguments(**filtered)
+    return {key: value for key, value in kwargs.items() if key in params}
+
+
+def _training_arguments(**kwargs: Any) -> TrainingArguments:
+    params = inspect.signature(TrainingArguments.__init__).parameters
+    return TrainingArguments(**_compat_training_kwargs(params, **kwargs))
 
 
 def train_from_config(config_path: str) -> Path:

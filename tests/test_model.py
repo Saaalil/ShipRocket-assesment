@@ -5,7 +5,7 @@ from transformers import WhisperConfig
 
 from smart_turn.model import SmartTurnModel
 from smart_turn.splits import grouped_indices, keep_language, language_allowlist
-from smart_turn.train import _training_arguments
+from smart_turn.train import _compat_training_kwargs
 
 
 def test_tiny_forward_and_freeze() -> None:
@@ -44,18 +44,23 @@ def test_grouped_split_is_disjoint() -> None:
 
 
 def test_training_arguments_accept_warmup() -> None:
-    args = _training_arguments(
+    v4 = _compat_training_kwargs(
+        {"output_dir", "warmup_ratio", "evaluation_strategy"},
         output_dir="artifacts/test_run",
         warmup_ratio=0.08,
         eval_strategy="no",
-        report_to=[],
-        per_device_train_batch_size=1,
-        num_train_epochs=1,
     )
-    warmup = getattr(args, "warmup_ratio", None)
-    if warmup is None:
-        warmup = args.warmup_steps
-    assert float(warmup) == 0.08
+    assert v4["warmup_ratio"] == 0.08
+    assert v4["evaluation_strategy"] == "no"
+    v5 = _compat_training_kwargs(
+        {"output_dir", "warmup_steps", "eval_strategy"},
+        output_dir="artifacts/test_run",
+        warmup_ratio=0.08,
+        eval_strategy="no",
+    )
+    assert v5["warmup_steps"] == 0.08
+    assert v5["eval_strategy"] == "no"
+    assert "warmup_ratio" not in v5
 
 
 def test_language_filter_keeps_english_and_hindi() -> None:
