@@ -98,14 +98,39 @@ def _load_hf_dataset(
 
 
 def build_model(config: dict[str, Any]) -> SmartTurnModel:
+    base = config["base_model"]
     model = SmartTurnModel.from_pretrained(
-        config["base_model"],
+        base,
         num_labels=1,
         ignore_mismatched_sizes=True,
     )
+    _copy_short_positions(model, base)
     if config.get("freeze_encoder", True):
         model.freeze_encoder(unfreeze_last_n=int(config.get("unfreeze_encoder_layers", 0)))
     return model
+
+
+def _copy_short_positions(model: SmartTurnModel, base_model: str) -> None:
+    """Whisper Tiny has 1500 positions (30s). Copy the first 400 (8s) instead of freezing random ones."""
+    from transformers import WhisperModel
+
+    source = WhisperModel.from_pretrained(base_model).encoder.embed_positions.weight.detach()
+    dest = model.encoder.embed_positions.weight
+    n = min(int(source.shape[0]), int(dest.shape[0]))
+    with torch.no_grad():
+        dest[:n].copy_(source[:n])
+
+
+def _latest_checkpoint(output_dir: Path) -> str | None:
+    numbered: list[tuple[int, Path]] = []
+    for path in output_dir.glob("checkpoint-*"):
+        try:
+            numbered.append((int(path.name.split("-")[1]), path))
+        except (IndexError, ValueError):
+            continue
+    if not numbered:
+        return None
+    return str(max(numbered)[1])
 
 
 def prepare_splits(config: dict[str, Any]) -> tuple[TurnDataset, TurnDataset]:
@@ -168,6 +193,10 @@ def train_from_config(config_path: str) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     model = build_model(config)
     train_ds, val_ds = prepare_splits(config)
+    eval_strategy = str(config.get("eval_strategy", "steps"))
+    load_best = bool(config.get("load_best_model_at_end", eval_strategy != "no"))
+    if eval_strategy == "no":
+        load_best = False
     args = _training_arguments(
         output_dir=str(output_dir),
         per_device_train_batch_size=int(config.get("train_batch_size", 8)),
@@ -179,17 +208,17 @@ def train_from_config(config_path: str) -> Path:
         weight_decay=float(config.get("weight_decay", 0.01)),
         max_grad_norm=float(config.get("max_grad_norm", 1.0)),
         fp16=bool(config.get("fp16", True)),
-        eval_strategy="steps",
+        eval_strategy=eval_strategy,
         eval_steps=int(config.get("eval_steps", 200)),
         save_steps=int(config.get("save_steps", 200)),
         logging_steps=int(config.get("logging_steps", 20)),
-        load_best_model_at_end=True,
+        load_best_model_at_end=load_best,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
         report_to=[],
         remove_unused_columns=False,
         dataloader_num_workers=0,
-        save_total_limit=2,
+        save_total_limit=int(config.get("save_total_limit", 2)),
     )
 
     def compute_metrics_hf(eval_pred) -> dict[str, float]:
@@ -209,7 +238,14 @@ def train_from_config(config_path: str) -> Path:
         compute_metrics=compute_metrics_hf,
     )
     resume = config.get("resume_from")
+    if resume in (True, "auto", "latest"):
+        resume = _latest_checkpoint(output_dir)
+        if resume:
+            print(f"resuming from {resume}")
     trainer.train(resume_from_checkpoint=resume if resume else None)
+    if eval_strategy == "no":
+        metrics = trainer.evaluate()
+        print(f"final eval: {metrics}")
     final_dir = output_dir / "final_model"
     trainer.save_model(str(final_dir))
     WhisperFeatureExtractor(chunk_length=MAX_AUDIO_SECONDS).save_pretrained(str(final_dir))
