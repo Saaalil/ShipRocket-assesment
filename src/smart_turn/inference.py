@@ -66,7 +66,8 @@ def resolve_model_path(explicit: str | None = None, allow_official_fallback: boo
     if allow_official_fallback:
         return _download_hf_onnx("pipecat-ai/smart-turn-v3", "smart-turn-v3.2-cpu.onnx")
     raise FileNotFoundError(
-        "No ONNX model found. Train/export first, publish to Hugging Face, or set SMART_TURN_ONNX_PATH."
+        "No ONNX model found. Train/export first, publish to Hugging Face, "
+        "or set SMART_TURN_ONNX_PATH."
     )
 
 

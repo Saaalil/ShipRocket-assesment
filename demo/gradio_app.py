@@ -42,7 +42,10 @@ def _model_label() -> str:
     for local in (Path("artifacts/model_fp32.onnx"), Path("artifacts/model_int8.onnx")):
         if local.exists():
             return f"Serving `{local}`"
-    return f"Will download `{HF_MODEL_REPO}` (or the official Pipecat fallback if that repo is empty)."
+    return (
+        f"Will download `{HF_MODEL_REPO}` "
+        "(or the official Pipecat fallback if that repo is empty)."
+    )
 
 
 def _to_waveform(audio) -> tuple[np.ndarray, int]:

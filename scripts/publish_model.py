@@ -44,7 +44,13 @@ def main() -> None:
             repo_id=args.repo,
             repo_type="model",
             path_in_repo="pytorch",
-            allow_patterns=["*.safetensors", "*.json", "*.txt", "config.json", "preprocessor_config.json"],
+            allow_patterns=[
+                "*.safetensors",
+                "*.json",
+                "*.txt",
+                "config.json",
+                "preprocessor_config.json",
+            ],
         )
         print("uploaded pytorch/")
     print(f"published https://huggingface.co/{args.repo}")

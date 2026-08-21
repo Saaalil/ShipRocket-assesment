@@ -111,7 +111,7 @@ def build_model(config: dict[str, Any]) -> SmartTurnModel:
 
 
 def _copy_short_positions(model: SmartTurnModel, base_model: str) -> None:
-    """Whisper Tiny has 1500 positions (30s). Copy the first 400 (8s) instead of freezing random ones."""
+    """Copy Whisper Tiny's first 400 embed positions (8s) from the 1500 (30s) table."""
     from transformers import WhisperModel
 
     source = WhisperModel.from_pretrained(base_model).encoder.embed_positions.weight.detach()
