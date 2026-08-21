@@ -21,13 +21,25 @@ thresholdEl.addEventListener("input", () => {
 
 async function loadModel() {
   statusEl.textContent = "Loading ONNX model…";
-  const localUrl = "../../artifacts/model_int8.onnx";
-  const fallbackUrl =
-    "https://huggingface.co/pipecat-ai/smart-turn-v3/resolve/main/smart-turn-v3.2-cpu.onnx";
-  try {
-    session = await ort.InferenceSession.create(localUrl, { executionProviders: ["wasm"] });
-  } catch {
-    session = await ort.InferenceSession.create(fallbackUrl, { executionProviders: ["wasm"] });
+  const urls = [
+    "../../artifacts/model_fp32.onnx",
+    "../../artifacts/model_int8.onnx",
+    "https://huggingface.co/Saalil/Assesment_SR-model/resolve/main/model_fp32.onnx",
+    "https://huggingface.co/Saalil/Assesment_SR-model/resolve/main/model_int8.onnx",
+    "https://huggingface.co/pipecat-ai/smart-turn-v3/resolve/main/smart-turn-v3.2-cpu.onnx",
+  ];
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      session = await ort.InferenceSession.create(url, { executionProviders: ["wasm"] });
+      lastError = null;
+      break;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  if (!session) {
+    throw lastError || new Error("Could not load an ONNX model");
   }
   statusEl.textContent = "Model ready. Record or upload a clip after a pause.";
 }

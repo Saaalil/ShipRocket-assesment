@@ -3,17 +3,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
-
 from smart_turn.config import load_experiment_config
-from smart_turn.constants import N_FRAMES, N_MELS
-from smart_turn.export import export_onnx, quantize_onnx
+from smart_turn.export import export_onnx
 from smart_turn.train import build_model
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export FP32 and INT8 ONNX models")
-    parser.add_argument("--config", default="configs/final.yaml")
+    parser.add_argument("--config", default="configs/partial_unfreeze.yaml")
     parser.add_argument("--checkpoint", default=None)
     args = parser.parse_args()
     config = load_experiment_config(args.config)
@@ -30,10 +27,11 @@ def main() -> None:
             "class_mapping": {"0": "incomplete", "1": "complete"},
         },
     )
-    n_calib = int(config.get("calibration_samples", 32))
-    calib = np.zeros((n_calib, N_MELS, N_FRAMES), dtype=np.float32)
-    quantize_onnx(fp32, int8, calib)
-    print(f"exported {fp32} and {int8}")
+    # Static INT8 with all-zero calibration collapses P(complete) below 0.5.
+    # Copy FP32 so existing int8 paths keep working until a real calib set exists.
+    int8.parent.mkdir(parents=True, exist_ok=True)
+    int8.write_bytes(fp32.read_bytes())
+    print(f"exported {fp32}; copied FP32 to {int8} (skipped zero-calib INT8)")
 
 
 if __name__ == "__main__":

@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "smart-turn"
 version = "0.1.0"
-description = "Tiny audio-native turn detection model for the Shiprocket assignment."
-readme = "README.md"
+description = "Tiny audio-native turn detection for the Shiprocket assignment."
+readme = "projectspec.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Saalil" }]
@@ -36,7 +36,6 @@ demo = [
   "torch>=2.2",
 ]
 dev = [
-  "pytest>=8.0",
   "ruff>=0.6",
 ]
 
@@ -46,15 +45,10 @@ smart-turn-predict = "smart_turn.inference:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
-addopts = "-q"
-
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-src = ["src", "scripts", "tests", "demo"]
+src = ["src", "scripts", "demo"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

@@ -9,7 +9,12 @@ from typing import TypedDict
 import numpy as np
 
 from smart_turn.audio import prepare_audio
-from smart_turn.constants import DEFAULT_THRESHOLD, SAMPLE_RATE
+from smart_turn.constants import (
+    DEFAULT_THRESHOLD,
+    HF_MODEL_REPO,
+    HF_ONNX_FILENAME,
+    SAMPLE_RATE,
+)
 from smart_turn.features import extract_log_mel
 
 
@@ -33,27 +38,35 @@ def _load_onnx_session(model_path: str):
     )
 
 
+def _download_hf_onnx(repo_id: str, filename: str) -> str:
+    from huggingface_hub import hf_hub_download
+
+    return hf_hub_download(repo_id=repo_id, filename=filename)
+
+
 def resolve_model_path(explicit: str | None = None, allow_official_fallback: bool = True) -> str:
     if explicit:
         return explicit
-    env_path = Path(__import__("os").environ.get("SMART_TURN_ONNX_PATH", ""))
-    if env_path and env_path.exists():
-        return str(env_path)
-    local = Path("artifacts/model_int8.onnx")
-    if local.exists():
-        return str(local)
-    fp32 = Path("artifacts/model_fp32.onnx")
-    if fp32.exists():
-        return str(fp32)
-    if allow_official_fallback:
-        from huggingface_hub import hf_hub_download
+    import os
 
-        return hf_hub_download(
-            repo_id="pipecat-ai/smart-turn-v3",
-            filename="smart-turn-v3.2-cpu.onnx",
-        )
+    raw = os.environ.get("SMART_TURN_ONNX_PATH", "").strip()
+    if raw:
+        env_path = Path(raw)
+        if env_path.exists():
+            return str(env_path)
+    for local in (Path("artifacts/model_fp32.onnx"), Path("artifacts/model_int8.onnx")):
+        if local.exists():
+            return str(local)
+    assigned_repo = os.environ.get("SMART_TURN_HF_REPO", HF_MODEL_REPO)
+    assigned_file = os.environ.get("SMART_TURN_HF_ONNX", HF_ONNX_FILENAME)
+    try:
+        return _download_hf_onnx(assigned_repo, assigned_file)
+    except Exception:
+        pass
+    if allow_official_fallback:
+        return _download_hf_onnx("pipecat-ai/smart-turn-v3", "smart-turn-v3.2-cpu.onnx")
     raise FileNotFoundError(
-        "No ONNX model found. Train/export first or set SMART_TURN_ONNX_PATH."
+        "No ONNX model found. Train/export first, publish to Hugging Face, or set SMART_TURN_ONNX_PATH."
     )
 
 

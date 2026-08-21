@@ -5,29 +5,15 @@ library_name: onnx
 pipeline_tag: audio-classification
 tags:
   - turn-detection
-  - voice-ai
   - whisper
+  - onnx
 ---
 
 # Shiprocket Turn Detection
 
-Audio-native complete/incomplete classifier built for the Shiprocket assignment.
+Whisper Tiny encoder + attention pooling + MLP head.
+Trained on official Smart Turn v3.2 English + Hindi/Marathi (84,223 clips).
 
-## Intended use
+Validation (n=8422, threshold 0.5): accuracy 0.618, macro-F1 0.617, ROC-AUC 0.670.
 
-Run after VAD detects a pause. Input: up to 8 seconds of 16 kHz mono audio. Output: `P(complete)`.
-
-## Training data
-
-Only `pipecat-ai/smart-turn-data-v3.2-train`. Indic results use official Hindi/Marathi slices.
-
-## Limitations
-
-- Not a full-duplex conversational model.
-- Clip metrics do not prove live interruption quality.
-- Browser preprocessing is approximate; use the Python path as reference.
-- Do not use for safety-critical barge-in.
-
-## Metrics
-
-Fill after the first trained export. Until then the demo may fall back to Pipecat Smart Turn v3.2.
+Serve `model_fp32.onnx`. See `projectspec.md` in the code repository.

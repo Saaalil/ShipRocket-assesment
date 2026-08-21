@@ -1,0 +1,7 @@
+gradio==6.25.0
+huggingface_hub>=0.25.2
+transformers>=4.44
+onnxruntime>=1.18
+numpy>=1.26
+soundfile>=0.12
+pyyaml>=6.0

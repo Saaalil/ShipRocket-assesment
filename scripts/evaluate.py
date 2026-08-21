@@ -36,7 +36,7 @@ def main() -> None:
     metrics = compute_metrics(labels, probs, threshold)
     metrics["selected_threshold"] = threshold
     metrics["by_language"] = slice_metrics(labels, probs, languages, threshold)
-    out = Path("reports/metrics") / f"{config['name']}_eval.json"
+    out = Path("reports") / f"{config['name']}_eval.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"metrics": metrics, "sweep": sweep[:5]}, indent=2), encoding="utf-8")
     print(json.dumps(metrics, indent=2))
